@@ -1,0 +1,8 @@
+Instalar MySQL:
+-> sudo apt-get install mysql-server mysql-client
+
+Instalar librería MySQL
+-> sudo apt-get install libmysqlclient.dev
+
+Para compilar:
+-> gcc -o archivo $(mysql_config --cflags) archivo.c $(mysql_config --libs)
