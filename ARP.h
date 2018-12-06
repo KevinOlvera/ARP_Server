@@ -14,6 +14,12 @@
 unsigned char MACOrigen[6];
 unsigned char IPOrigen[4];
 
+unsigned char My_MAC[6];
+unsigned char My_IP[4];
+
+unsigned char MAC_Clear[6] = {0x00,0x00,0x00,0x00,0x00,0x00};
+unsigned char IP_Clear[4] = {0x00,0x00,0x00,0x00};
+
 unsigned char MACDestino[6] = {0x00,0x00,0x00,0x00,0x00,0x00};
 unsigned char IPDestino[4] = {0x00,0x00,0x00,0x00};
 
@@ -40,11 +46,15 @@ int obtenerDatos(int ds);
 void estructuraTrama(unsigned char *trama, int index);
 void obtenerIPDestino(int index);
 void enviaTrama(int ds, int indice, unsigned char *trama);
-void recibeTrama(int ds, unsigned char *trama);
 void imprimeTrama(unsigned char *trama, int tam);
+void recibeTrama(int ds, unsigned char *trama);
+void ARP_Server(int ds, int indice, unsigned char *trama_e, unsigned char *trama_r);
+void Gratuitus_ARP_Reply(unsigned char *mac_o, unsigned char *ip_o, unsigned char *mac_d, unsigned char *ip_d, unsigned char *trama);
+void Gratuitus_ARP_Request(unsigned char *mac_o, unsigned char *ip_o, unsigned char *mac_d, unsigned char *ip_d, unsigned char *trama);
 
 void BD_MySQL_Connect();
 void BD_MySQL_Close();
 void BD_MySQL_Save_Data(unsigned char *trama);
 void BD_MySQL_Show_Data();
+int BD_MySQL_Find_IP(unsigned char *ip);
 void BD_MySQL_Reset_Data();

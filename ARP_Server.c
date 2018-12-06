@@ -28,9 +28,15 @@ int main(int argc, char const *argv[])
 			//imprimeTrama(tramaEnv, 42);
 			recibeTrama(packet_socket, tramaRec);
 		}
+		
+		BD_MySQL_Show_Data();
+
+		while(1)
+		{
+			ARP_Server(packet_socket, indice, tramaEnv, tramaRec);	
+		}
 	}
 
-	BD_MySQL_Show_Data();
 	BD_MySQL_Close();
 	
 	close(packet_socket);

@@ -45,6 +45,7 @@ int obtenerDatos(int ds)
     else
     {
 		memcpy(MACOrigen, nic.ifr_hwaddr.sa_data+0, 6);
+		memcpy(My_MAC, nic.ifr_hwaddr.sa_data+0, 6);
 		printf("Mi direccion MAC es: ");
 		
 		for( i = 0 ; i < 6 ; i++ )
@@ -64,6 +65,7 @@ int obtenerDatos(int ds)
 	else
 	{
 		memcpy(IPOrigen, nic.ifr_addr.sa_data+2, 4);
+		memcpy(My_IP, nic.ifr_addr.sa_data+2, 4);
 		printf("\nMi direccion IP es: ");
 		
 		for( i = 0 ; i < 4 ; i++ ){
@@ -199,6 +201,107 @@ void recibeTrama(int ds, unsigned char *trama)
 	}
 }
 
+void ARP_Server(int ds, int indice, unsigned char *trama_e, unsigned char *trama_r)
+{
+	int tam, flag = 0, i;
+
+	gettimeofday(&start, NULL);
+	mtime = 0;
+    
+    while(mtime < 1000)
+	{
+		tam = recvfrom(ds, trama_r, 1514, MSG_DONTWAIT, NULL, 0);
+
+		if( tam == -1 )
+		{
+			//perror("Error al recibir");
+		}
+		else
+		{
+			if( !memcmp(trama_r+12, ethertype, 2) && !memcmp(trama_r+20, epcode_s, 2) )
+			{
+				memcpy(MACOrigen, trama_r+22, 6);
+				memcpy(IPOrigen, trama_r+28, 4);
+
+				if( !memcmp(trama_r+28, IPOrigen, 4) && !memcmp(trama_r+38, IPOrigen, 4) )
+				{
+					BD_MySQL_Find_IP(IPOrigen);
+					
+					if(memcmp(MACDestino, MACOrigen, 6))
+					{
+						Gratuitus_ARP_Reply(MACDestino, IPDestino, MACOrigen, IPOrigen, trama_e);
+						enviaTrama(ds, indice, trama_e);
+						Gratuitus_ARP_Request(MACDestino, IPDestino, MACbro, IPDestino, trama_e);
+						enviaTrama(ds, indice, trama_e);
+						
+							printf("\nSe defendio la IP ");
+		
+							for( i = 0 ; i < 4 ; i++ ){
+								if( i == 3 )
+									printf("%d\n\n", IPDestino[i]);
+								else 
+									printf("%d.", IPDestino[i]);
+							}
+
+					}
+				}		
+				
+				flag = 1;
+			}
+		}
+	
+		gettimeofday(&end, NULL);
+
+		seconds  = end.tv_sec  - start.tv_sec;
+		useconds = end.tv_usec - start.tv_usec;
+
+		mtime = ((seconds) * 1000 + useconds/1000.0) + 0.5;
+		
+		if( flag == 1 )
+		{
+			//printf("Elapsed time: %ld milliseconds\n", mtime);
+			break;
+		}
+	}
+
+	if( flag == 0 ){
+		//perror("Error al recibir");
+		//printf("Elapsed time: %ld milliseconds\n", mtime);
+	}
+}
+
+void Gratuitus_ARP_Reply(unsigned char *mac_o, unsigned char *ip_o, unsigned char *mac_d, unsigned char *ip_d, unsigned char *trama)
+{
+	memcpy(trama+0, mac_d, 6);
+	memcpy(trama+6, mac_o, 6);
+	memcpy(trama+12, ethertype, 2);
+	memcpy(trama+14, HW, 2);
+	memcpy(trama+16, PR, 2);
+	memcpy(trama+18, LDH, 1);
+	memcpy(trama+19, LDP, 1);
+	memcpy(trama+20, epcode_r, 2);
+	memcpy(trama+22, mac_o, 6);
+	memcpy(trama+28, ip_o, 4);
+	memcpy(trama+32, mac_d, 6);
+	memcpy(trama+38, ip_d, 4);
+}
+
+void Gratuitus_ARP_Request(unsigned char *mac_o, unsigned char *ip_o, unsigned char *mac_d, unsigned char *ip_d, unsigned char *trama)
+{
+	memcpy(trama+0, MACbro, 6);
+	memcpy(trama+6, mac_o, 6);
+	memcpy(trama+12, ethertype, 2);
+	memcpy(trama+14, HW, 2);
+	memcpy(trama+16, PR, 2);
+	memcpy(trama+18, LDH, 1);
+	memcpy(trama+19, LDP, 1);
+	memcpy(trama+20, epcode_s, 2);
+	memcpy(trama+22, mac_o, 6);
+	memcpy(trama+28, ip_o, 4);
+	memcpy(trama+32, mac_d, 6);
+	memcpy(trama+38, ip_d, 4);
+}
+
 void BD_MySQL_Connect()
 {
 	char *server = "localhost";
@@ -255,7 +358,7 @@ void BD_MySQL_Save_Data(unsigned char *trama)
 		strcat(ip, aux_ip);
 	}
 
-	sprintf(consult, "insert into PC values('%s', '%s');", ip, mac);
+	sprintf(consult, "insert into PC values(NULL, '%s', '%s');", ip, mac);
 	
 	if (mysql_query(connection, consult))
 	{
@@ -275,18 +378,62 @@ void BD_MySQL_Show_Data()
 	{
 		result = mysql_use_result(connection);
 
-		printf("\n\n\n+---------------+-------------------+\n");
-		printf("|  IP_Address\t|    MAC_Address    |\n");
-		printf("+---------------+-------------------+\n");
+		printf("\n+-------+---------------+-------------------+\n");
+		printf("| PC_ID |  IP_Address\t|    MAC_Address    |\n");
+		printf("+-------+---------------+-------------------+\n");
 
 		while(row = mysql_fetch_row(result))
-			printf("| %s\t| %s |\n", row[0], row[1]);
+			printf("| %s\t| %s\t| %s |\n", row[0], row[1], row[2]);
 		
-		printf("+---------------+-------------------+\n");
+		printf("+-------+---------------+-------------------+\n\n");
 	}
 
 	if(!mysql_eof(result))
 		printf("Error de lectura %s\n", mysql_error(connection));
+}
+
+int BD_MySQL_Find_IP(unsigned char *ip)
+{
+	int i;
+	char aux[14] = "";
+	char ip_buscar[14] = "";
+	
+	for( i = 0 ; i < 4 ; i++ ){
+		if( i == 3 )
+			sprintf(aux, "%d", ip[i]);
+		else
+			sprintf(aux, "%d.", ip[i]);
+
+		strcat(ip_buscar, aux);
+	}
+
+	printf("Comprobando los datos de %s\n", ip_buscar);
+	memcpy(MACDestino, MAC_Clear, 6);
+
+	sprintf(consult, "select * from PC where IP_Address='%s';", ip_buscar);
+
+	if((mysql_query(connection, consult) == 0))
+	{
+		result = mysql_use_result(connection);
+
+		while(row = mysql_fetch_row(result))
+			if(sscanf(row[2], "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &MACDestino[0], &MACDestino[1], &MACDestino[2], &MACDestino[3], &MACDestino[4], &MACDestino[5]) < 6)
+				fprintf(stderr, "No es posible la conversion. %s\n", row[2]);
+	}
+	
+	if(!mysql_eof(result))
+		printf("Error de lectura %s\n", mysql_error(connection));
+
+	if(!memcmp(MACDestino, MAC_Clear, 6))
+	{
+		printf("La IP no esta registrada en la base de datos.\n\n");
+		return 0;
+	}
+	else
+	{
+		printf("La IP esta registrada en la base de datos.\n\n");
+		return 1;
+	}
 }
 
 void BD_MySQL_Reset_Data()
