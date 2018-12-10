@@ -229,18 +229,25 @@ void ARP_Server(int ds, int indice, unsigned char *trama_e, unsigned char *trama
 					
 					if(memcmp(MACDestino, MACOrigen, 6))
 					{
+						imprimeTrama(trama_r, 42);
+
 						Gratuitus_ARP_Reply(MACDestino, IPDestino, MACOrigen, IPOrigen, trama_e);
 						enviaTrama(ds, indice, trama_e);
-						Gratuitus_ARP_Request(MACDestino, IPDestino, MACbro, IPDestino, trama_e);
+
+						imprimeTrama(trama_e, 42);
+
+						Gratuitus_ARP_Request(MACDestino, IPDestino, MACbro, IPOrigen, trama_e);
 						enviaTrama(ds, indice, trama_e);
+
+						imprimeTrama(trama_e, 42);
 						
 							printf("\nSe defendio la IP ");
 		
 							for( i = 0 ; i < 4 ; i++ ){
 								if( i == 3 )
-									printf("%d\n\n", IPDestino[i]);
+									printf("%d\n\n", IPOrigen[i]);
 								else 
-									printf("%d.", IPDestino[i]);
+									printf("%d.", IPOrigen[i]);
 							}
 
 					}
@@ -281,7 +288,7 @@ void Gratuitus_ARP_Reply(unsigned char *mac_o, unsigned char *ip_o, unsigned cha
 	memcpy(trama+19, LDP, 1);
 	memcpy(trama+20, epcode_r, 2);
 	memcpy(trama+22, mac_o, 6);
-	memcpy(trama+28, ip_o, 4);
+	memcpy(trama+28, ip_d, 4);
 	memcpy(trama+32, mac_d, 6);
 	memcpy(trama+38, ip_d, 4);
 }
@@ -297,8 +304,8 @@ void Gratuitus_ARP_Request(unsigned char *mac_o, unsigned char *ip_o, unsigned c
 	memcpy(trama+19, LDP, 1);
 	memcpy(trama+20, epcode_s, 2);
 	memcpy(trama+22, mac_o, 6);
-	memcpy(trama+28, ip_o, 4);
-	memcpy(trama+32, mac_d, 6);
+	memcpy(trama+28, ip_d, 4);
+	memcpy(trama+32, MAC_Clear, 6);
 	memcpy(trama+38, ip_d, 4);
 }
 
@@ -378,7 +385,7 @@ void BD_MySQL_Show_Data()
 	{
 		result = mysql_use_result(connection);
 
-		printf("\n+-------+---------------+-------------------+\n");
+		printf("\n\n+-------+---------------+-------------------+\n");
 		printf("| PC_ID |  IP_Address\t|    MAC_Address    |\n");
 		printf("+-------+---------------+-------------------+\n");
 
@@ -431,7 +438,7 @@ int BD_MySQL_Find_IP(unsigned char *ip)
 	}
 	else
 	{
-		printf("La IP esta registrada en la base de datos.\n\n");
+		printf("La IP esta registrada en la base de datos.\n");
 		return 1;
 	}
 }
