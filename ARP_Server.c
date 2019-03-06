@@ -1,11 +1,10 @@
-#include "ARP.c"
+#include "comnet.c"
 
 int main(int argc, char const *argv[])
 {
-	int packet_socket, indice;
+	int packet_socket, index;
 
 	BD_MySQL_Connect();
-	//BD_MySQL_Reset_Data();
     
 	packet_socket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 
@@ -17,24 +16,18 @@ int main(int argc, char const *argv[])
 	else
 	{
 		perror("Exito al abrir el socket");
-		indice = obtenerDatos(packet_socket);
+		index = getData(packet_socket);
         
-		int index;
-
-		/*for(index = 1;index < 255;index++)
-		{
-			estructuraTrama(tramaEnv, index);
-			enviaTrama(packet_socket, indice, tramaEnv);
-			//imprimeTrama(tramaEnv, 42);
-			recibeTrama(packet_socket, tramaRec);
-		}*/
-		
 		BD_MySQL_Show_Data();
+		char search_ip[14] = "";
+		printf("Introduce la IP a defender\n -> ");
+		scanf("%s", search_ip);
+
+		stringToIP(search_ip);
+		memcpy(source_IP, IP, 6);
 
 		while(1)
-		{
-			ARP_Server(packet_socket, indice, tramaEnv, tramaRec);	
-		}
+			ARPserver(packet_socket, index, search_ip);	
 	}
 
 	BD_MySQL_Close();
