@@ -66,6 +66,7 @@ void printFrame(unsigned char *frame, int size);
 void printARPinfo(unsigned char *frame, int size);
 void receiveFrame(int sd, unsigned char *frame);
 void stringToIP(char *ip_s);
+char *IPToString(unsigned char *ip);
 void getDestinationIP(int index);
 
 void BD_MySQL_Connect();
@@ -76,6 +77,6 @@ void BD_MySQL_Reset_Data();
 
 int BD_MySQL_Find_IP(char *ip);
 
-void ARPserver(int sd, int index, char search_ip[]);
-void gratARPreply(unsigned char *frame, unsigned char *s_MAC, unsigned char *s_IP, unsigned char *d_MAC);
-void gratARPrequest(unsigned char *frame, unsigned char *s_MAC, unsigned char *s_IP);
+void ARPserver(int sd, int index);
+void gratARPreply(unsigned char *frame, unsigned char *s_MAC, unsigned char *d_MAC, unsigned char *d_IP);
+void gratARPrequest(unsigned char *frame, unsigned char *d_MAC, unsigned char *d_IP);

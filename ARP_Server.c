@@ -19,15 +19,11 @@ int main(int argc, char const *argv[])
 		index = getData(packet_socket);
         
 		BD_MySQL_Show_Data();
-		char search_ip[14] = "";
-		printf("Introduce la IP a defender\n -> ");
-		scanf("%s", search_ip);
-
-		stringToIP(search_ip);
-		memcpy(source_IP, IP, 6);
+		
+		printf("Servidor ONLINE\n\n");
 
 		while(1)
-			ARPserver(packet_socket, index, search_ip);	
+			ARPserver(packet_socket, index);
 	}
 
 	BD_MySQL_Close();

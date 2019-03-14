@@ -195,8 +195,15 @@ void printFrame(unsigned char *frame, int size)
 void printARPinfo(unsigned char *frame, int size)
 {
 	int i;
+	
+	if(!memcmp(frame+20, epcode_ARP_request, 2))
+		printf("Solicitud ARP\n");
+	else if(!memcmp(frame+20, epcode_ARP_replay, 2))
+		printf("Respuesta ARP\n\n");
+	
+	printf("+---------------------------------------+\n");
 
-	printf("\nDireccion MAC: ");
+	printf("Direccion MAC Origen: ");
 
 	for( i = 22 ; i < 28 ; i++ )
 	{
@@ -206,7 +213,7 @@ void printARPinfo(unsigned char *frame, int size)
 			printf("%.2X:", frame[i]);
 	}
 
-	printf("Direccion IP: ");
+	printf("Direccion IP Origen: ");
 
 	for( i = 28 ; i < 32 ; i++ )
 	{
@@ -215,6 +222,28 @@ void printARPinfo(unsigned char *frame, int size)
 		else 
 			printf("%d.", frame[i]);
 	}
+
+	printf("Direccion MAC Destino: ");
+
+	for( i = 32 ; i < 38 ; i++ )
+	{
+		if(i == 37)
+			printf("%.2X\n", frame[i]);
+		else
+			printf("%.2X:", frame[i]);
+	}
+
+	printf("Direccion IP Destino: ");
+
+	for( i = 38 ; i < 42 ; i++ )
+	{
+		if( i == 41 )
+			printf("%d\n", frame[i]);
+		else 
+			printf("%d.", frame[i]);
+	}
+
+	printf("+---------------------------------------+\n");
 }
 
 void receiveFrame(int sd, unsigned char *frame)
@@ -271,17 +300,36 @@ void stringToIP(char *ip_s)
 	inet_aton(ip_s, (struct in_addr *)IP);
 }
 
+char *IPToString(unsigned char *ip)
+{
+	char *ip_s = malloc(14);
+	char aux[14];
+	
+	strcpy(ip_s, "");
+
+	for( int i = 0 ; i < 4 ; i++ )
+	{
+		if( i == 3 )
+			sprintf(aux, "%d", ip[i]);
+		else
+			sprintf(aux, "%d.", ip[i]);
+
+		strcat(ip_s, aux);
+	}
+
+	return ip_s;
+}
+
 void getDestinationIP(int index)
 {
     dest_IP[0] = my_IP[0];
 	dest_IP[1] = my_IP[1];
 	dest_IP[2] = my_IP[2];
 
-	int i;
 	char ip[14] = "";
 	char aux[14] = "";
 	
-	for( i = 0 ; i < 3 ; i++ ){
+	for( int i = 0 ; i < 3 ; i++ ){
 		sprintf(aux, "%d.", dest_IP[i]);
 		strcat(ip, aux);
 	}
@@ -393,7 +441,7 @@ void BD_MySQL_Reset_Data()
 	}
 }
 
-void ARPserver(int sd, int index, char search_ip[])
+void ARPserver(int sd, int index)
 {
 	int size, flag = 0;
 
@@ -410,39 +458,42 @@ void ARPserver(int sd, int index, char search_ip[])
 		}
 		else
 		{
-			if( !memcmp(frame_r+0, bro_MAC, 6) && !memcmp(frame_r+12, ethertype_ARP, 2) && !memcmp(frame_r+20, epcode_ARP_request, 2) && !memcmp(frame_r+28, source_IP, 4) && !memcmp(frame_r+38, source_IP, 4) )
+			if( !memcmp(frame_r+0, bro_MAC, 6) && !memcmp(frame_r+12, ethertype_ARP, 2) && !memcmp(frame_r+20, epcode_ARP_request, 2) && (!memcmp(frame_r+28, frame_r+38, 4) || !memcmp(frame_r+28, clear_IP, 4)) )
 			{
-				memcpy(dest_MAC, frame_r+22, 6);
 
-				//printFrame(frame_r, 42);
+				memcpy(source_MAC, frame_r+22, 6);
+				memcpy(source_IP, frame_r+38, 4);
 
-				if( BD_MySQL_Find_IP(search_ip) )
+				if( BD_MySQL_Find_IP(IPToString(source_IP)) == 1 )
 				{
-					if( memcmp(dest_MAC, MAC, 6) )
+					if( memcmp(source_MAC, MAC, 6) )
 					{
-						gratARPreply(frame_s, MAC, source_IP, dest_MAC);
+						printARPinfo(frame_r, size);
+						
+						gratARPreply(frame_s, source_MAC, MAC, source_IP);
 						sendFrame(sd, index, frame_s, 42);
 
 						gratARPrequest(frame_s, MAC, source_IP);
 						sendFrame(sd, index, frame_s, 42);
 
-						printf("El equipo ");
+						memcpy(source_MAC, frame_r+22, 6);
+
 						for( int i = 0 ; i < 6 ; i++ )
 						{
 							if(i == 5)
-								printf("%.2X ", dest_MAC[i]);
+								printf("%.2X ", source_MAC[i]);
 							else
-								printf("%.2X:", dest_MAC[i]);
+								printf("%.2X:", source_MAC[i]);
 						}
-						printf("ha intentado conectarse a %s sin exito.\n", search_ip);
-
-					}
-				}
-				else
-				{
-					exit(0);
-				}
-						
+						printf("ha intentado conectarse a ");
+						for( int i = 0 ; i < 4 ; i++ ){
+							if( i == 3 )
+								printf("%d\n\n", source_IP[i]);
+							else 
+								printf("%d.", source_IP[i]);
+						}
+					}					
+				}					
 			
 				flag = 1;
 			}
@@ -460,10 +511,10 @@ void ARPserver(int sd, int index, char search_ip[])
 	}
 }
 
-void gratARPreply(unsigned char *frame, unsigned char *s_MAC, unsigned char *s_IP, unsigned char *d_MAC)
+void gratARPreply(unsigned char *frame, unsigned char *s_MAC, unsigned char *d_MAC, unsigned char *d_IP)
 {
-	memcpy(frame+0, d_MAC, 6);
-	memcpy(frame+6, s_MAC, 6);
+	memcpy(frame+0, s_MAC, 6);
+	memcpy(frame+6, d_MAC, 6);
 	memcpy(frame+12, ethertype_ARP, 2);
 	memcpy(frame+14, HW, 2);
 	memcpy(frame+16, PR, 2);
@@ -471,16 +522,16 @@ void gratARPreply(unsigned char *frame, unsigned char *s_MAC, unsigned char *s_I
 	memcpy(frame+19, LDP, 1);
 	memcpy(frame+20, epcode_ARP_replay, 2);
 
-	memcpy(frame+22, s_MAC, 6);
-	memcpy(frame+28, s_IP, 4);
-	memcpy(frame+32, d_MAC, 6);
-	memcpy(frame+38, s_IP, 4);
+	memcpy(frame+22, d_MAC, 6);
+	memcpy(frame+28, d_IP, 4);
+	memcpy(frame+32, s_MAC, 6);
+	memcpy(frame+38, d_IP, 4);
 }
 
-void gratARPrequest(unsigned char *frame, unsigned char *s_MAC, unsigned char *s_IP)
+void gratARPrequest(unsigned char *frame, unsigned char *d_MAC, unsigned char *d_IP)
 {
 	memcpy(frame+0, bro_MAC, 6);
-	memcpy(frame+6, s_MAC, 6);
+	memcpy(frame+6, d_MAC, 6);
 	memcpy(frame+12, ethertype_ARP, 2);
 	memcpy(frame+14, HW, 2);
 	memcpy(frame+16, PR, 2);
@@ -488,10 +539,10 @@ void gratARPrequest(unsigned char *frame, unsigned char *s_MAC, unsigned char *s
 	memcpy(frame+19, LDP, 1);
 	memcpy(frame+20, epcode_ARP_request, 2);
 
-	memcpy(frame+22, s_MAC, 6);
-	memcpy(frame+28, s_IP, 4);
+	memcpy(frame+22, d_MAC, 6);
+	memcpy(frame+28, d_IP, 4);
 	memcpy(frame+32, clear_MAC, 6);
-	memcpy(frame+38, s_IP, 4);
+	memcpy(frame+38, d_IP, 4);
 }
 
 int BD_MySQL_Find_IP(char *ip)
@@ -514,12 +565,12 @@ int BD_MySQL_Find_IP(char *ip)
 
 	if(!memcmp(MAC, clear_MAC, 6))
 	{
-		printf("La IP no esta registrada en la base de datos.\n\n");
+		//printf("La IP no esta registrada en la base de datos.\n\n");
 		return 0;
 	}
 	else
 	{
-		printf("La IP esta registrada en la base de datos.\n");
+		//printf("La IP esta registrada en la base de datos.\n");
 		return 1;
 	}
 }
